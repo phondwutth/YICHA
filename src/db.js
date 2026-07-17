@@ -26,8 +26,11 @@ if (process.env.SEED_B64) {
   );
   if (!hasData) {
     // ตารางเปล่าๆ ที่ schema สร้างไว้ต้องทิ้งก่อน เพราะใน dump มี CREATE TABLE ของมันเอง
+    // (ปิด FK ชั่วคราว ไม่งั้นลบตารางที่ถูกอ้างถึงไม่ได้)
+    db.pragma('foreign_keys = OFF');
     for (const t of tables) db.exec(`DROP TABLE "${t}"`);
     db.exec(Buffer.from(process.env.SEED_B64, 'base64').toString('utf8'));
+    db.pragma('foreign_keys = ON');
     console.log('🌱 seed ข้อมูลจาก SEED_B64 สำเร็จ');
   }
 }
