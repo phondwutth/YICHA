@@ -60,8 +60,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.once(Events.ClientReady, (c) => {
+client.once(Events.ClientReady, async (c) => {
   console.log(`✅ ล็อกอินสำเร็จ: ${c.user.tag}`);
+  try {
+    await require('./lib/forum').ensureWithdrawForum(c);
+    console.log('🧾 forum เบิกเงินพร้อม');
+  } catch (err) {
+    console.error('ตั้งค่า forum เบิกเงินไม่สำเร็จ:', err.message);
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);

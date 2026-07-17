@@ -10,6 +10,7 @@ const {
 const db = require('../db');
 const { ensureMember } = require('../lib/members');
 const { textField, num } = require('../lib/modal');
+const { getSetting } = require('../lib/forum');
 
 function reqEmbed(row, requesterTag) {
   const color = { pending: 0xf1c40f, paid: 0x2ecc71, rejected: 0xe74c3c }[row.status];
@@ -60,14 +61,15 @@ module.exports = {
       if (row.requester !== ensureMember(interaction.user))
         return interaction.reply({ content: '❌ ลบได้เฉพาะคนที่ขอเบิกรายการนี้', ephemeral: true });
       db.prepare('DELETE FROM reimbursements WHERE id = ?').run(id);
-      // ปิด thread ของรายการนี้ด้วย (เก็บไว้ดูย้อนหลังได้ ไม่ลบทิ้ง)
-      if (interaction.message.thread)
-        await interaction.message.thread.setArchived(true).catch(() => {});
-      return interaction.update({
-        content: `🗑️ รายการเบิก \`#${id}\` ถูกลบโดยผู้ขอ`,
+      await interaction.update({
+        content: `🗑️ รายการเบิก \`#${id}\` ถูกยกเลิกโดยผู้ขอ`,
         embeds: [],
         components: [],
       });
+      // ปิดโพสต์นี้ (เก็บไว้ดูย้อนหลังได้ ไม่ลบทิ้ง)
+      if (interaction.channel?.isThread())
+        await interaction.channel.setArchived(true).catch(() => {});
+      return;
     }
 
     // อนุมัติ/ปฏิเสธ: ต้องมี role KB
@@ -105,14 +107,16 @@ module.exports = {
       components: [], // เอาปุ่มออก
     });
 
-    // แจ้งผลเข้า thread ของรายการนี้
-    const thread = interaction.message.thread;
-    if (thread) {
+    // อัปเดตแท็กสถานะ + แจ้งผลในโพสต์
+    const post = interaction.channel;
+    if (post?.isThread()) {
+      const tagId = getSetting(`forumtag:withdraw:${action === 'approve' ? 'paid' : 'rejected'}`);
+      if (tagId) await post.setAppliedTags([tagId]).catch(() => {});
       const note =
         action === 'approve'
-          ? `${verb} — ยอด ${row.amount.toFixed(2)}฿\n📎 โอนแล้วอย่าลืมแนบสลิปไว้ในเทรดนี้เป็นหลักฐาน`
+          ? `${verb} — ยอด ${row.amount.toFixed(2)}฿\n📎 โอนแล้วอย่าลืมแนบสลิปไว้ในโพสต์นี้เป็นหลักฐาน`
           : `${verb}`;
-      await thread.send(note).catch(() => {});
+      await post.send(note).catch(() => {});
     }
   },
 };
@@ -134,6 +138,17 @@ async function request(interaction) {
     return interaction.reply({ content: '❌ จำนวนเงินต้องเป็นตัวเลข เช่น 500', ephemeral: true });
   const reason = interaction.fields.getTextInputValue('reason').trim();
   const memberId = ensureMember(interaction.user);
+
+  // โพสต์ลง forum เบิกเงิน (บอทสร้าง forum ให้เองตอนสตาร์ท)
+  const forumId = getSetting('forum:withdraw');
+  const forum = forumId
+    ? await interaction.client.channels.fetch(forumId).catch(() => null)
+    : null;
+  if (!forum)
+    return interaction.reply({
+      content: '❌ ยังไม่พบ forum เบิกเงิน — รีสตาร์ทบอทแล้วลองใหม่',
+      ephemeral: true,
+    });
 
   const info = db
     .prepare(
@@ -157,23 +172,22 @@ async function request(interaction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  await interaction.reply({
-    content: '📢 มีคำขอเบิกเงินใหม่ — รออนุมัติ',
-    embeds: [reqEmbed(row, `${interaction.user}`)],
-    components: [buttons],
+  // สร้างโพสต์ใน forum: การ์ด + ปุ่ม + แท็ก "รออนุมัติ"
+  const pendingTag = getSetting('forumtag:withdraw:pending');
+  const post = await forum.threads.create({
+    name: `เบิก#${row.id} ${reason} (${amount.toFixed(0)}฿)`.slice(0, 100),
+    appliedTags: pendingTag ? [pendingTag] : [],
+    message: {
+      content: `📢 คำขอเบิกเงินจาก ${interaction.user} — รออนุมัติ\n📎 แนบสลิป/หลักฐานในโพสต์นี้ได้เลย`,
+      embeds: [reqEmbed(row, `${interaction.user}`)],
+      components: [buttons],
+    },
   });
 
-  // เปิด thread ใต้การ์ดเบิก — ไว้แนบสลิป/หลักฐาน/คุยกันเฉพาะรายการนี้
-  try {
-    const msg = await interaction.fetchReply();
-    const thread = await msg.startThread({
-      name: `🧾 เบิก#${row.id} ${reason}`.slice(0, 100),
-      autoArchiveDuration: 10080, // เก็บ 7 วันถ้าเงียบ
-    });
-    await thread.send('📎 แนบรูปสลิป/หลักฐานของรายการนี้ได้ในเทรดนี้เลย');
-  } catch (err) {
-    console.error('เปิด thread ไม่สำเร็จ:', err.message);
-  }
+  return interaction.reply({
+    content: `✅ สร้างคำขอเบิก \`#${row.id}\` แล้ว → ${post}`,
+    ephemeral: true,
+  });
 }
 
 function list(interaction) {

@@ -9,7 +9,7 @@ const CHANNEL_MAP = {
   cost: '🧮-ต้นทุน',
   product: '🍽-เมนู',
   expense: '💸-รายจ่าย',
-  withdraw: '🧾-เบิกเงิน',
+  // withdraw ไม่ล็อกแชแนล — พิมพ์จากไหนก็ได้ โพสต์จะไปลง forum 🧾-เบิกเงิน
   supplier: '🏭-ซัพพลายเออร์',
   milestone: '🎯-milestone',
 };
