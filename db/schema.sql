@@ -230,6 +230,7 @@ CREATE TABLE IF NOT EXISTS milestones (
   status       TEXT NOT NULL DEFAULT 'todo', -- todo / doing / done / dropped
   progress_pct INTEGER NOT NULL DEFAULT 0,
   created_by   INTEGER REFERENCES members(id),
+  thread_id    TEXT,                   -- โพสต์ใน forum 🎯-milestone ของเป้าหมายนี้
   created_at   TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   completed_at TEXT
 );

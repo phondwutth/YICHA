@@ -11,7 +11,7 @@ const CHANNEL_MAP = {
   expense: '💸-รายจ่าย',
   // withdraw ไม่ล็อกแชแนล — พิมพ์จากไหนก็ได้ โพสต์จะไปลง forum 🧾-เบิกเงิน
   supplier: '🏭-ซัพพลายเออร์',
-  milestone: '🎯-milestone',
+  // milestone ไม่ล็อกแชแนล — พิมพ์จากไหนก็ได้ โพสต์จะไปลง forum 🎯-milestone
 };
 
 const getStmt = db.prepare('SELECT value FROM settings WHERE key = ?');

@@ -39,4 +39,8 @@ if (process.env.SEED_B64) {
 const schema = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
 db.exec(schema);
 
+// migration สำหรับ DB เก่าที่สร้างก่อน schema จะมีคอลัมน์ใหม่ (CREATE IF NOT EXISTS ไม่เติมคอลัมน์ให้)
+const msCols = db.prepare(`PRAGMA table_info(milestones)`).all().map((c) => c.name);
+if (!msCols.includes('thread_id')) db.exec(`ALTER TABLE milestones ADD COLUMN thread_id TEXT`);
+
 module.exports = db;

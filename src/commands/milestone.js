@@ -10,6 +10,7 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const { ensureMember } = require('../lib/members');
+const { getSetting, milestoneTags } = require('../lib/forum');
 
 const CAT = [
   { name: 'setup ตั้งร้าน', value: 'setup' },
@@ -146,7 +147,7 @@ function openAddModal(interaction) {
   return interaction.showModal(modal);
 }
 
-function submitAdd(interaction) {
+async function submitAdd(interaction) {
   const title = interaction.fields.getTextInputValue('title').trim();
   const desc = interaction.fields.getTextInputValue('desc').trim();
 
@@ -165,6 +166,16 @@ function submitAdd(interaction) {
     });
   }
 
+  const forumId = getSetting('forum:milestone');
+  const forum = forumId
+    ? await interaction.client.channels.fetch(forumId).catch(() => null)
+    : null;
+  if (!forum)
+    return interaction.reply({
+      content: '❌ ยังไม่พบ forum milestone — รีสตาร์ทบอทแล้วลองใหม่',
+      ephemeral: true,
+    });
+
   const memberId = ensureMember(interaction.user);
   const info = db
     .prepare(
@@ -172,11 +183,38 @@ function submitAdd(interaction) {
        VALUES (?, ?, ?, ?, ?)`,
     )
     .run(title, desc || null, category, target || null, memberId);
-  return interaction.reply(
-    `🎯 เพิ่ม milestone **${title}** (\`#${info.lastInsertRowid}\`)` +
-      (category ? `\nหมวด: ${category}` : '') +
-      (target ? `\nกำหนดเสร็จ: ${target}` : ''),
-  );
+  const id = info.lastInsertRowid;
+
+  // สร้างโพสต์ใน forum: 1 โพสต์ = 1 เป้าหมาย
+  const row = db.prepare('SELECT * FROM milestones WHERE id = ?').get(id);
+  const lines = [`🎯 **${title}**`];
+  if (desc) lines.push(desc);
+  if (target) lines.push(`📅 กำหนดเสร็จ: ${target}`);
+  lines.push(bar(0));
+  lines.push(`\nสร้างโดย ${interaction.user} · อัปเดตด้วย \`/milestone progress milestone:${id} pct:...\``);
+  const post = await forum.threads.create({
+    name: `${title}${target ? ` (เป้า ${target})` : ''}`.slice(0, 100),
+    appliedTags: milestoneTags(row),
+    message: { content: lines.join('\n') },
+  });
+  db.prepare(`UPDATE milestones SET thread_id = ? WHERE id = ?`).run(post.id, id);
+
+  return interaction.reply({
+    content: `🎯 เพิ่ม **${title}** (\`#${id}\`) แล้ว → ${post}`,
+    ephemeral: true,
+  });
+}
+
+// อัปเดตโพสต์ใน forum ของ milestone นี้: สลับแท็ก + โพสต์ความคืบหน้า
+async function updatePost(client, msId, note) {
+  const row = db.prepare('SELECT * FROM milestones WHERE id = ?').get(msId);
+  if (!row || !row.thread_id) return null;
+  const post = await client.channels.fetch(row.thread_id).catch(() => null);
+  if (!post || !post.isThread()) return null;
+  if (post.archived) await post.setArchived(false).catch(() => {});
+  await post.setAppliedTags(milestoneTags(row)).catch(() => {});
+  await post.send(note).catch(() => {});
+  return post;
 }
 
 const THAI_MONTH = [
@@ -209,6 +247,7 @@ function listMs(interaction) {
     out += `\n**${monthHead(ym)}**\n`;
     for (const r of items) {
       out += `${r.status === 'done' ? '✅ ' : ''}\`#${r.id}\` ${r.title}`;
+      if (r.thread_id) out += ` → <#${r.thread_id}>`;
       if (r.target_date) out += ` · ${r.target_date}`;
       if (r.description) {
         const d = r.description.replace(/\s+/g, ' ').trim();
@@ -220,7 +259,7 @@ function listMs(interaction) {
   return interaction.reply(out.trim().slice(0, 1900));
 }
 
-function progressMs(interaction) {
+async function progressMs(interaction) {
   const ms = findMilestone(interaction.options.getString('milestone'));
   if (!ms) return interaction.reply({ content: '❌ ไม่เจอ milestone นี้', ephemeral: true });
   const pct = interaction.options.getInteger('pct');
@@ -232,16 +271,25 @@ function progressMs(interaction) {
     completed,
     ms.id,
   );
+  const note = `📊 ${interaction.user} อัปเดตความคืบหน้า\n${bar(pct)}` + (pct >= 100 ? '\n🎉 เสร็จแล้ว!' : '');
+  const post = await updatePost(interaction.client, ms.id, note);
   return interaction.reply(
-    `📊 **${ms.title}**\n${bar(pct)}` + (pct >= 100 ? '\n🎉 เสร็จแล้ว!' : ''),
+    `📊 **${ms.title}**\n${bar(pct)}` +
+      (pct >= 100 ? '\n🎉 เสร็จแล้ว!' : '') +
+      (post ? `\n→ ${post}` : ''),
   );
 }
 
-function doneMs(interaction) {
+async function doneMs(interaction) {
   const ms = findMilestone(interaction.options.getString('milestone'));
   if (!ms) return interaction.reply({ content: '❌ ไม่เจอ milestone นี้', ephemeral: true });
   db.prepare(
     `UPDATE milestones SET status = 'done', progress_pct = 100, completed_at = ? WHERE id = ?`,
   ).run(new Date().toISOString(), ms.id);
-  return interaction.reply(`✅ **${ms.title}** เสร็จแล้ว! 🎉`);
+  const post = await updatePost(
+    interaction.client,
+    ms.id,
+    `✅ ${interaction.user} ปิดเป้าหมายนี้ — เสร็จแล้ว! 🎉\n${bar(100)}`,
+  );
+  return interaction.reply(`✅ **${ms.title}** เสร็จแล้ว! 🎉` + (post ? `\n→ ${post}` : ''));
 }

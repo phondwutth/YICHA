@@ -63,10 +63,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ ล็อกอินสำเร็จ: ${c.user.tag}`);
   try {
-    await require('./lib/forum').ensureWithdrawForum(c);
-    console.log('🧾 forum เบิกเงินพร้อม');
+    await require('./lib/forum').ensureForums(c);
+    console.log('🗂️ forum ทั้งหมดพร้อม (เบิกเงิน + milestone)');
   } catch (err) {
-    console.error('ตั้งค่า forum เบิกเงินไม่สำเร็จ:', err.message);
+    console.error('ตั้งค่า forum ไม่สำเร็จ:', err.message);
   }
 });
 
