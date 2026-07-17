@@ -14,13 +14,22 @@ const db = new Database(path.join(dbDir, 'xuebot.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-// seed ข้อมูลครั้งแรก (ใช้ตอนย้ายขึ้น cloud): ถ้า DB ยังว่างเปล่า + มี env SEED_B64
-// ให้ import SQL dump (base64) ที่ย้ายมาจากเครื่องเดิม — รันแค่ครั้งเดียวตอน DB ว่างเท่านั้น
-const noTables =
-  db.prepare(`SELECT COUNT(*) c FROM sqlite_master WHERE type = 'table'`).get().c === 0;
-if (noTables && process.env.SEED_B64) {
-  db.exec(Buffer.from(process.env.SEED_B64, 'base64').toString('utf8'));
-  console.log('🌱 seed ข้อมูลจาก SEED_B64 สำเร็จ');
+// seed ข้อมูลครั้งแรก (ใช้ตอนย้ายขึ้น cloud): ถ้ามี env SEED_B64 + DB ยังไม่มีข้อมูลจริง
+// ให้ import SQL dump (base64) ที่ย้ายมาจากเครื่องเดิม — ถ้ามีข้อมูลอยู่แล้วจะไม่แตะอะไรเลย
+if (process.env.SEED_B64) {
+  const tables = db
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`)
+    .all()
+    .map((r) => r.name);
+  const hasData = tables.some(
+    (t) => db.prepare(`SELECT COUNT(*) c FROM "${t}"`).get().c > 0,
+  );
+  if (!hasData) {
+    // ตารางเปล่าๆ ที่ schema สร้างไว้ต้องทิ้งก่อน เพราะใน dump มี CREATE TABLE ของมันเอง
+    for (const t of tables) db.exec(`DROP TABLE "${t}"`);
+    db.exec(Buffer.from(process.env.SEED_B64, 'base64').toString('utf8'));
+    console.log('🌱 seed ข้อมูลจาก SEED_B64 สำเร็จ');
+  }
 }
 
 // รัน schema.sql ทุกครั้งที่เริ่ม (ทุกคำสั่งเป็น "IF NOT EXISTS" จึงรันซ้ำได้ปลอดภัย)
