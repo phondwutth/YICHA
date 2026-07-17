@@ -60,6 +60,9 @@ module.exports = {
       if (row.requester !== ensureMember(interaction.user))
         return interaction.reply({ content: '❌ ลบได้เฉพาะคนที่ขอเบิกรายการนี้', ephemeral: true });
       db.prepare('DELETE FROM reimbursements WHERE id = ?').run(id);
+      // ปิด thread ของรายการนี้ด้วย (เก็บไว้ดูย้อนหลังได้ ไม่ลบทิ้ง)
+      if (interaction.message.thread)
+        await interaction.message.thread.setArchived(true).catch(() => {});
       return interaction.update({
         content: `🗑️ รายการเบิก \`#${id}\` ถูกลบโดยผู้ขอ`,
         embeds: [],
@@ -101,6 +104,16 @@ module.exports = {
       embeds: [reqEmbed(row)],
       components: [], // เอาปุ่มออก
     });
+
+    // แจ้งผลเข้า thread ของรายการนี้
+    const thread = interaction.message.thread;
+    if (thread) {
+      const note =
+        action === 'approve'
+          ? `${verb} — ยอด ${row.amount.toFixed(2)}฿\n📎 โอนแล้วอย่าลืมแนบสลิปไว้ในเทรดนี้เป็นหลักฐาน`
+          : `${verb}`;
+      await thread.send(note).catch(() => {});
+    }
   },
 };
 
@@ -115,7 +128,7 @@ function openRequestModal(interaction) {
   return interaction.showModal(modal);
 }
 
-function request(interaction) {
+async function request(interaction) {
   const amount = num(interaction.fields.getTextInputValue('amount'));
   if (amount == null || amount <= 0)
     return interaction.reply({ content: '❌ จำนวนเงินต้องเป็นตัวเลข เช่น 500', ephemeral: true });
@@ -144,11 +157,23 @@ function request(interaction) {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return interaction.reply({
+  await interaction.reply({
     content: '📢 มีคำขอเบิกเงินใหม่ — รออนุมัติ',
     embeds: [reqEmbed(row, `${interaction.user}`)],
     components: [buttons],
   });
+
+  // เปิด thread ใต้การ์ดเบิก — ไว้แนบสลิป/หลักฐาน/คุยกันเฉพาะรายการนี้
+  try {
+    const msg = await interaction.fetchReply();
+    const thread = await msg.startThread({
+      name: `🧾 เบิก#${row.id} ${reason}`.slice(0, 100),
+      autoArchiveDuration: 10080, // เก็บ 7 วันถ้าเงียบ
+    });
+    await thread.send('📎 แนบรูปสลิป/หลักฐานของรายการนี้ได้ในเทรดนี้เลย');
+  } catch (err) {
+    console.error('เปิด thread ไม่สำเร็จ:', err.message);
+  }
 }
 
 function list(interaction) {
