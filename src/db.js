@@ -43,4 +43,13 @@ db.exec(schema);
 const msCols = db.prepare(`PRAGMA table_info(milestones)`).all().map((c) => c.name);
 if (!msCols.includes('thread_id')) db.exec(`ALTER TABLE milestones ADD COLUMN thread_id TEXT`);
 
+// maintenance: ล้างตารางเบิกเงินครั้งเดียว — ตั้ง env WIPE_REIMBURSEMENTS=1 แล้ว restart
+// (backup ลง log ก่อนลบเสมอ · เสร็จแล้วต้องเอา env ออกด้วย)
+if (process.env.WIPE_REIMBURSEMENTS === '1') {
+  const rows = db.prepare('SELECT * FROM reimbursements').all();
+  console.log('🗑️ backup reimbursements ก่อนล้าง: ' + JSON.stringify(rows));
+  db.prepare('DELETE FROM reimbursements').run();
+  console.log(`🗑️ ล้างตาราง reimbursements แล้ว (${rows.length} รายการ)`);
+}
+
 module.exports = db;
