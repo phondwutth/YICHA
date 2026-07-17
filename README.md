@@ -64,3 +64,22 @@ xuebot/
 
 ## ➕ เพิ่มคำสั่งใหม่
 สร้างไฟล์ใน `src/commands/` ที่ export `{ data, execute }` แล้วรัน `npm run deploy`
+
+---
+
+## ☁️ Deploy ขึ้น Railway (รัน 24 ชม.)
+
+1. เข้า https://railway.app → login ด้วย GitHub
+2. **New Project → Deploy from GitHub repo** → เลือก repo นี้
+3. ที่ service → แท็บ **Variables** เพิ่ม:
+   - `DISCORD_TOKEN` = token ของบอท
+   - `CLIENT_ID` = application id
+   - `GUILD_ID` = server id
+   - `DB_DIR` = `/data`
+   - `SEED_B64` = เนื้อหาไฟล์ `db/seed.b64` (ถ้าอยากย้ายข้อมูลจากเครื่องเดิม — ใส่ครั้งแรกครั้งเดียว)
+4. คลิกขวาที่ service → **Attach Volume** → mount path = `/data`
+5. รอ deploy เสร็จ → ดู **Logs** ต้องเห็น `✅ ล็อกอินสำเร็จ`
+6. **ปิดบอทที่รันในเครื่อง** (ห้ามรันสองตัวพร้อมกัน จะตอบซ้อนกัน)
+
+> อัปเดตโค้ดครั้งถัดไป: แค่ `git push` — Railway จะ build + restart ให้เอง
+> ถ้าแก้ชื่อ/option ของ slash command ต้องรัน `npm run deploy` จากเครื่องด้วย
