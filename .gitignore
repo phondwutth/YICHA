@@ -7,3 +7,4 @@ db/*.db-wal
 .DS_Store
 db/dump.sql
 db/seed.b64
+db/backup-*.json
