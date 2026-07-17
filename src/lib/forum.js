@@ -124,11 +124,42 @@ async function backfillMilestones(forum) {
   }
 }
 
+// โพสต์ปักหมุดใน forum เบิกเงิน: มีปุ่มกดเปิดฟอร์มขอเบิก (ไม่ต้องพิมพ์คำสั่ง)
+async function ensureWithdrawOpenPost(forum) {
+  const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+  const savedId = getSetting('wd:openpost');
+  let post = savedId ? await forum.client.channels.fetch(savedId).catch(() => null) : null;
+  if (!post) {
+    post = await forum.threads.create({
+      name: '📌 กดปุ่มในนี้เพื่อขอเบิกเงิน',
+      message: {
+        content:
+          'กดปุ่มด้านล่างเพื่อเปิดฟอร์มขอเบิกเงิน\n' +
+          'ระบบจะสร้างโพสต์ใหม่ให้ (1 โพสต์ = 1 รายการเบิก) แล้วแนบสลิป/หลักฐานในโพสต์นั้นได้เลย',
+        components: [
+          new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('wd:open:0')
+              .setLabel('🧾 ขอเบิกเงิน')
+              .setStyle(ButtonStyle.Primary),
+          ),
+        ],
+      },
+    });
+    await post.pin().catch(() => {});
+    setS.run('wd:openpost', post.id);
+    console.log('📌 สร้างโพสต์ปุ่มขอเบิกเงินแล้ว');
+  } else if (post.archived) {
+    await post.setArchived(false).catch(() => {}); // กันโพสต์ปุ่มโดน auto-archive จนหาย
+  }
+}
+
 async function ensureForums(client) {
   const guild = await client.guilds.fetch(process.env.GUILD_ID);
   for (const spec of FORUMS) {
     const forum = await ensureForum(guild, spec);
     if (spec.key === 'milestone') await backfillMilestones(forum);
+    if (spec.key === 'withdraw') await ensureWithdrawOpenPost(forum);
   }
 }
 

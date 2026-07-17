@@ -50,6 +50,10 @@ module.exports = {
 
   async handleButton(interaction) {
     const [, action, idStr] = interaction.customId.split(':');
+
+    // ปุ่ม "ขอเบิกเงิน" จากโพสต์ปักหมุด -> เปิดฟอร์มเดียวกับ /withdraw request
+    if (action === 'open') return openRequestModal(interaction);
+
     const id = Number(idStr);
     const row = db.prepare('SELECT * FROM reimbursements WHERE id = ?').get(id);
     if (!row) return interaction.reply({ content: '❌ ไม่เจอรายการนี้', ephemeral: true });
