@@ -1,0 +1,21 @@
+{
+  "name": "xuebot",
+  "version": "0.1.0",
+  "description": "Discord backend bot for a Chinese tea shop — milestones, expenses, recipes, cost, suppliers",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node src/deploy-commands.js",
+    "setup-channels": "node src/setup-channels.js",
+    "setup-roles": "node src/setup-roles.js",
+    "setup-pins": "node src/setup-pins.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
