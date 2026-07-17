@@ -46,6 +46,11 @@ const setS = db.prepare(
 );
 const getSetting = (key) => (getS.get(key) || {}).value || null;
 
+// เทียบชื่อแท็กแบบตัด variation selector (U+FE0F) — Discord ตัดตัวนี้ทิ้งตอนเก็บชื่อ
+// ถ้าเทียบตรงๆ จะนึกว่าแท็กหายแล้วเพิ่มซ้ำจนโดน "Tag names must be unique"
+const norm = (str) => str.replace(/\uFE0F/g, '');
+const sameTag = (a, b) => norm(a) === norm(b);
+
 async function ensureForum(guild, spec) {
   // หา forum: จาก id ที่เซฟไว้ -> จากชื่อ -> สร้างใหม่
   let forum = null;
@@ -76,14 +81,14 @@ async function ensureForum(guild, spec) {
   setS.run(`forum:${spec.key}`, forum.id);
 
   // ผูกแท็ก: เติมที่ขาด แล้วเซฟ id ตามชื่อ
-  const missing = spec.tags.filter((t) => !forum.availableTags.some((a) => a.name === t.name));
+  const missing = spec.tags.filter((t) => !forum.availableTags.some((a) => sameTag(a.name, t.name)));
   if (missing.length)
     forum = await forum.setAvailableTags([
       ...forum.availableTags,
       ...missing.map((t) => ({ name: t.name })),
     ]);
   for (const t of spec.tags) {
-    const tag = forum.availableTags.find((a) => a.name === t.name);
+    const tag = forum.availableTags.find((a) => sameTag(a.name, t.name));
     if (tag) setS.run(`forumtag:${spec.key}:${t.key}`, tag.id);
   }
   return forum;
