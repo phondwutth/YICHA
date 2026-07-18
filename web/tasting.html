@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧋 บันทึกผลชิมชา — YICHA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f7f1e8;
+    --milk: #fffaf3;
+    --tea: #8b5e3c;
+    --tea-dark: #5d3f28;
+    --tea-light: #c9a17e;
+    --accent: #b9805a;
+    --ink: #3d2f24;
+    --line: #e8dccb;
+    --good: #7a9d54;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Prompt', 'Noto Sans Thai', system-ui, sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 { font-size: 1.9rem; font-weight: 700; color: var(--tea-dark); letter-spacing: .5px; }
+  header p { color: var(--tea); font-weight: 300; margin-top: 4px; }
+  header .date { font-size: .85rem; color: var(--tea-light); margin-top: 2px; }
+
+  .card {
+    background: var(--milk);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 4px 18px rgba(93, 63, 40, .07);
+  }
+
+  /* ---------- ฟอร์ม ---------- */
+  form .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  form .field { flex: 1 1 200px; margin-bottom: 16px; }
+  label { display: block; font-size: .85rem; font-weight: 500; color: var(--tea); margin-bottom: 6px; }
+  input[type="text"], textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    font: inherit;
+    color: var(--ink);
+    transition: border-color .15s;
+  }
+  input[type="text"]:focus, textarea:focus { outline: none; border-color: var(--tea-light); }
+  textarea { resize: vertical; min-height: 72px; }
+
+  /* สไลเดอร์รสชาติ */
+  .sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .slider-box { background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+  .slider-box .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .slider-box .val { font-weight: 600; color: var(--tea-dark); font-size: 1.05rem; }
+  input[type="range"] {
+    width: 100%; appearance: none; height: 6px; border-radius: 3px;
+    background: linear-gradient(to right, var(--tea) 0%, var(--tea) var(--fill, 50%), var(--line) var(--fill, 50%));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--milk); border: 3px solid var(--tea); cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+  }
+
+  /* ดาวคะแนนรวม */
+  .stars { display: flex; gap: 6px; font-size: 2rem; cursor: pointer; user-select: none; }
+  .stars span { color: #ddcfbc; transition: transform .1s, color .1s; }
+  .stars span.on { color: #e8a33d; }
+  .stars span:hover { transform: scale(1.15); }
+
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+  button {
+    font: inherit; font-weight: 600; border: none; cursor: pointer;
+    padding: 12px 26px; border-radius: 999px; transition: transform .1s, opacity .15s;
+  }
+  button:hover { transform: translateY(-1px); opacity: .92; }
+  .btn-save { background: var(--tea); color: #fff; flex: 1; }
+  .btn-clear { background: transparent; color: var(--tea); border: 1.5px solid var(--tea-light); }
+  .btn-reset { background: #c0563f; color: #fff; }
+
+  /* ---------- ผลชิม ---------- */
+  #results { margin-top: 34px; }
+  .results-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .results-head h2 { font-size: 1.2rem; color: var(--tea-dark); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+
+  .taste-card { position: relative; background: var(--milk); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; box-shadow: 0 3px 12px rgba(93,63,40,.06); }
+  .taste-card .del {
+    position: absolute; top: 10px; right: 12px; background: none; border: none;
+    color: #c9b8a4; font-size: 1rem; padding: 4px; cursor: pointer;
+  }
+  .taste-card .del:hover { color: #c0563f; }
+  .taste-card h3 { color: var(--tea-dark); font-size: 1.1rem; margin-bottom: 2px; padding-right: 22px; }
+  .taste-card .ver { font-size: .8rem; color: var(--tea-light); margin-bottom: 8px; }
+  .taste-card .score { color: #e8a33d; font-size: 1.1rem; letter-spacing: 2px; margin-bottom: 10px; }
+  .axis { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: .82rem; }
+  .axis .name { width: 64px; color: var(--tea); }
+  .axis .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .axis .bar i { display: block; height: 100%; background: linear-gradient(to right, var(--tea-light), var(--tea)); border-radius: 4px; }
+  .axis .num { width: 18px; text-align: right; font-weight: 600; color: var(--tea-dark); }
+  .taste-card .fb { margin-top: 10px; font-size: .88rem; background: #fff; border-radius: 10px; padding: 8px 12px; border: 1px dashed var(--line); }
+  .taste-card .meta { margin-top: 10px; font-size: .75rem; color: var(--tea-light); display: flex; justify-content: space-between; }
+
+  .empty { text-align: center; color: var(--tea-light); padding: 30px 0; font-weight: 300; }
+
+  /* ข้อความเตือนตอนกรอกไม่ครบ */
+  #warn {
+    display: none; margin-top: 12px; padding: 10px 16px; border-radius: 12px;
+    background: #fdecdf; color: #a04b2c; border: 1px solid #f0c9ac; font-size: .9rem;
+  }
+  #warn.show { display: block; animation: pop .18s ease; }
+  @keyframes pop { from { transform: scale(.97); opacity: 0; } }
+  footer { text-align: center; margin-top: 40px; font-size: .8rem; color: var(--tea-light); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧋 บันทึกผลชิมชา</h1>
+    <p>YICHA · tasting log</p>
+    <div class="date" id="today"></div>
+  </header>
+
+  <div class="card">
+    <form id="form" onsubmit="return false">
+      <div class="row">
+        <div class="field" style="flex:2 1 260px">
+          <label>ชื่อชา / สูตร *</label>
+          <input type="text" id="name" placeholder="เช่น ชานมหอมหมื่นลี้" required>
+        </div>
+        <div class="field">
+          <label>เวอร์ชัน / สิ่งที่ปรับ</label>
+          <input type="text" id="ver" placeholder="เช่น v2 — ลดน้ำตาล 10%">
+        </div>
+        <div class="field">
+          <label>ผู้ชิม</label>
+          <input type="text" id="taster" placeholder="ชื่อคนชิม">
+        </div>
+      </div>
+
+      <div class="sliders">
+        <div class="slider-box">
+          <div class="top"><label>🍯 ความหวาน</label><span class="val" id="v-sweet">3</span></div>
+          <input type="range" id="sweet" min="1" max="5" step="1" value="3">
+        </div>
+        <div class="slider-box">
+          <div class="top"><label>🍵 ความเข้มชา</label><span class="val" id="v-body">3</span></div>
+          <input type="range" id="body" min="1" max="5" step="1" value="3">
+        </div>
+        <div class="slider-box">
+          <div class="top"><label>🌸 ความหอม</label><span class="val" id="v-aroma">3</span></div>
+          <input type="range" id="aroma" min="1" max="5" step="1" value="3">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>คะแนนรวม *</label>
+          <div class="stars" id="stars">
+            <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
+          </div>
+        </div>
+        <div class="field" style="flex:3 1 300px">
+          <label>ฟีดแบ็ก / คอมเมนต์</label>
+          <textarea id="fb" placeholder="เช่น หอมดี แต่หวานไปนิด ลองลดไซรัปเหลือ 20ml"></textarea>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button class="btn-save" id="save">＋ บันทึกผลชิม</button>
+        <button class="btn-clear" id="clear" type="button">ล้างฟอร์ม</button>
+      </div>
+      <div id="warn"></div>
+    </form>
+  </div>
+
+  <div id="results">
+    <div class="results-head">
+      <h2>📋 ผลชิมวันนี้ <span id="count"></span></h2>
+      <button class="btn-reset" id="reset" type="button">🗑 Reset ทั้งหมด</button>
+    </div>
+    <div class="grid" id="cards"></div>
+    <div class="empty" id="empty">ยังไม่มีผลชิม — กรอกฟอร์มด้านบนแล้วกดบันทึกเลย 🍵</div>
+  </div>
+
+  <footer>ทำด้วย ❤️ สำหรับช่วงคิดสูตร — screenshot หน้านี้เก็บไว้ได้เลย</footer>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const KEY = 'yicha-tasting';
+  let rating = 0;
+  let entries = JSON.parse(localStorage.getItem(KEY) || '[]');
+
+  // วันที่ไทยบนหัวเพจ
+  $('today').textContent = new Date().toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // สไลเดอร์: อัปเดตเลข + สีแถบ
+  for (const id of ['sweet', 'body', 'aroma']) {
+    const el = $(id);
+    const paint = () => {
+      $('v-' + id).textContent = el.value;
+      el.style.setProperty('--fill', ((el.value - 1) / 4) * 100 + '%');
+    };
+    el.addEventListener('input', paint);
+    paint();
+  }
+
+  // ดาว
+  $('stars').addEventListener('click', (e) => {
+    if (!e.target.dataset.v) return;
+    rating = Number(e.target.dataset.v);
+    [...$('stars').children].forEach((s) => s.classList.toggle('on', s.dataset.v <= rating));
+  });
+
+  function render() {
+    const cards = $('cards');
+    cards.innerHTML = '';
+    $('empty').style.display = entries.length ? 'none' : 'block';
+    $('count').textContent = entries.length ? `(${entries.length})` : '';
+    entries.forEach((t, i) => {
+      const c = document.createElement('div');
+      c.className = 'taste-card';
+      const axis = (label, v) =>
+        `<div class="axis"><span class="name">${label}</span><span class="bar"><i style="width:${(v / 5) * 100}%"></i></span><span class="num">${v}</span></div>`;
+      c.innerHTML =
+        `<button class="del" title="ลบรายการนี้" onclick="del(${i})">✕</button>` +
+        `<h3>${esc(t.name)}</h3>` +
+        (t.ver ? `<div class="ver">${esc(t.ver)}</div>` : '') +
+        `<div class="score">${'★'.repeat(t.rating)}${'☆'.repeat(5 - t.rating)}</div>` +
+        axis('🍯 หวาน', t.sweet) + axis('🍵 เข้มชา', t.body) + axis('🌸 หอม', t.aroma) +
+        (t.fb ? `<div class="fb">💬 ${esc(t.fb)}</div>` : '') +
+        `<div class="meta"><span>${t.taster ? '👤 ' + esc(t.taster) : ''}</span><span>${t.time}</span></div>`;
+      cards.appendChild(c);
+    });
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  window.del = (i) => {
+    entries.splice(i, 1);
+    localStorage.setItem(KEY, JSON.stringify(entries));
+    render();
+  };
+
+  let warnTimer;
+  function warn(msg) {
+    const w = $('warn');
+    w.textContent = '⚠️ ' + msg;
+    w.classList.add('show');
+    clearTimeout(warnTimer);
+    warnTimer = setTimeout(() => w.classList.remove('show'), 3000);
+  }
+
+  $('save').addEventListener('click', () => {
+    const name = $('name').value.trim();
+    if (!name) return warn('ใส่ชื่อชา/สูตรก่อนนะ');
+    if (!rating) return warn('ให้คะแนนรวม (ดาว) ก่อนนะ');
+    entries.unshift({
+      name,
+      ver: $('ver').value.trim(),
+      taster: $('taster').value.trim(),
+      sweet: Number($('sweet').value),
+      body: Number($('body').value),
+      aroma: Number($('aroma').value),
+      rating,
+      fb: $('fb').value.trim(),
+      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+    });
+    localStorage.setItem(KEY, JSON.stringify(entries));
+    render();
+    clearForm(false); // เคลียร์เฉพาะช่องรสชาติ/ฟีดแบ็ก เก็บชื่อผู้ชิมไว้ชิมตัวถัดไป
+  });
+
+  function clearForm(all = true) {
+    $('name').value = '';
+    $('ver').value = '';
+    $('fb').value = '';
+    if (all) $('taster').value = '';
+    for (const id of ['sweet', 'body', 'aroma']) {
+      $(id).value = 3;
+      $(id).dispatchEvent(new Event('input'));
+    }
+    rating = 0;
+    [...$('stars').children].forEach((s) => s.classList.remove('on'));
+    $('name').focus();
+  }
+
+  $('clear').addEventListener('click', () => clearForm(true));
+
+  $('reset').addEventListener('click', () => {
+    if (!entries.length) return;
+    if (!confirm(`ลบผลชิมทั้งหมด ${entries.length} รายการ?`)) return;
+    entries = [];
+    localStorage.removeItem(KEY);
+    render();
+    clearForm(true);
+  });
+
+  render();
+</script>
+</body>
+</html>
