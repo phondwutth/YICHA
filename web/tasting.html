@@ -73,12 +73,6 @@
     box-shadow: 0 1px 4px rgba(0,0,0,.2);
   }
 
-  /* ดาวคะแนนรวม */
-  .stars { display: flex; gap: 6px; font-size: 2rem; cursor: pointer; user-select: none; }
-  .stars span { color: #ddcfbc; transition: transform .1s, color .1s; }
-  .stars span.on { color: #e8a33d; }
-  .stars span:hover { transform: scale(1.15); }
-
   .btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
   button {
     font: inherit; font-weight: 600; border: none; cursor: pointer;
@@ -103,7 +97,12 @@
   .taste-card .del:hover { color: #c0563f; }
   .taste-card h3 { color: var(--tea-dark); font-size: 1.1rem; margin-bottom: 2px; padding-right: 22px; }
   .taste-card .ver { font-size: .8rem; color: var(--tea-light); margin-bottom: 8px; }
-  .taste-card .score { color: #e8a33d; font-size: 1.1rem; letter-spacing: 2px; margin-bottom: 10px; }
+  .like-badge {
+    display: inline-block; background: #fdeef0; color: #b5485c; border: 1px solid #f3cdd4;
+    border-radius: 999px; padding: 3px 12px; font-size: .85rem; margin-bottom: 10px;
+  }
+  .like-badge b { font-size: 1.05rem; }
+  .color-line { margin-top: 8px; font-size: .85rem; color: var(--tea); }
   .axis { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: .82rem; }
   .axis .name { width: 64px; color: var(--tea); }
   .axis .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
@@ -137,7 +136,7 @@
       <div class="row">
         <div class="field" style="flex:2 1 260px">
           <label>ชื่อชา / สูตร *</label>
-          <input type="text" id="name" placeholder="เช่น ชานมหอมหมื่นลี้" required>
+          <input type="text" id="name" placeholder="เช่น ชานมหอมหมื่นลี้">
         </div>
         <div class="field">
           <label>เวอร์ชัน / สิ่งที่ปรับ</label>
@@ -151,25 +150,27 @@
 
       <div class="sliders">
         <div class="slider-box">
-          <div class="top"><label>🍯 ความหวาน</label><span class="val" id="v-sweet">3</span></div>
-          <input type="range" id="sweet" min="1" max="5" step="1" value="3">
+          <div class="top"><label>🍯 ความหวาน</label><span class="val" id="v-sweet">5</span></div>
+          <input type="range" id="sweet" min="1" max="10" step="1" value="5">
         </div>
         <div class="slider-box">
-          <div class="top"><label>🍵 ความเข้มชา</label><span class="val" id="v-body">3</span></div>
-          <input type="range" id="body" min="1" max="5" step="1" value="3">
+          <div class="top"><label>🍵 ความเข้มชา</label><span class="val" id="v-body">5</span></div>
+          <input type="range" id="body" min="1" max="10" step="1" value="5">
         </div>
         <div class="slider-box">
-          <div class="top"><label>🌸 ความหอม</label><span class="val" id="v-aroma">3</span></div>
-          <input type="range" id="aroma" min="1" max="5" step="1" value="3">
+          <div class="top"><label>🌸 ความหอม</label><span class="val" id="v-aroma">5</span></div>
+          <input type="range" id="aroma" min="1" max="10" step="1" value="5">
+        </div>
+        <div class="slider-box">
+          <div class="top"><label>❤️ ความชอบ</label><span class="val" id="v-like">5</span></div>
+          <input type="range" id="like" min="1" max="10" step="1" value="5">
         </div>
       </div>
 
       <div class="row">
         <div class="field">
-          <label>คะแนนรวม *</label>
-          <div class="stars" id="stars">
-            <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
-          </div>
+          <label>🎨 สีชา</label>
+          <input type="text" id="color" placeholder="เช่น น้ำตาลอ่อน อมส้ม">
         </div>
         <div class="field" style="flex:3 1 300px">
           <label>ฟีดแบ็ก / คอมเมนต์</label>
@@ -178,7 +179,7 @@
       </div>
 
       <div class="btns">
-        <button class="btn-save" id="save">＋ บันทึกผลชิม</button>
+        <button class="btn-save" id="save" type="button">＋ บันทึกผลชิม</button>
         <button class="btn-clear" id="clear" type="button">ล้างฟอร์ม</button>
       </div>
       <div id="warn"></div>
@@ -200,29 +201,22 @@
 <script>
   const $ = (id) => document.getElementById(id);
   const KEY = 'yicha-tasting';
-  let rating = 0;
   let entries = JSON.parse(localStorage.getItem(KEY) || '[]');
 
   // วันที่ไทยบนหัวเพจ
   $('today').textContent = new Date().toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  // สไลเดอร์: อัปเดตเลข + สีแถบ
-  for (const id of ['sweet', 'body', 'aroma']) {
+  // สไลเดอร์: อัปเดตเลข + สีแถบ (สเกล 1-10)
+  const SLIDERS = ['sweet', 'body', 'aroma', 'like'];
+  for (const id of SLIDERS) {
     const el = $(id);
     const paint = () => {
       $('v-' + id).textContent = el.value;
-      el.style.setProperty('--fill', ((el.value - 1) / 4) * 100 + '%');
+      el.style.setProperty('--fill', ((el.value - 1) / 9) * 100 + '%');
     };
     el.addEventListener('input', paint);
     paint();
   }
-
-  // ดาว
-  $('stars').addEventListener('click', (e) => {
-    if (!e.target.dataset.v) return;
-    rating = Number(e.target.dataset.v);
-    [...$('stars').children].forEach((s) => s.classList.toggle('on', s.dataset.v <= rating));
-  });
 
   function render() {
     const cards = $('cards');
@@ -233,13 +227,14 @@
       const c = document.createElement('div');
       c.className = 'taste-card';
       const axis = (label, v) =>
-        `<div class="axis"><span class="name">${label}</span><span class="bar"><i style="width:${(v / 5) * 100}%"></i></span><span class="num">${v}</span></div>`;
+        `<div class="axis"><span class="name">${label}</span><span class="bar"><i style="width:${(v / 10) * 100}%"></i></span><span class="num">${v}</span></div>`;
       c.innerHTML =
         `<button class="del" title="ลบรายการนี้" onclick="del(${i})">✕</button>` +
         `<h3>${esc(t.name)}</h3>` +
         (t.ver ? `<div class="ver">${esc(t.ver)}</div>` : '') +
-        `<div class="score">${'★'.repeat(t.rating)}${'☆'.repeat(5 - t.rating)}</div>` +
+        `<div class="like-badge">❤️ ความชอบ <b>${t.like}</b>/10</div>` +
         axis('🍯 หวาน', t.sweet) + axis('🍵 เข้มชา', t.body) + axis('🌸 หอม', t.aroma) +
+        (t.color ? `<div class="color-line">🎨 สีชา: ${esc(t.color)}</div>` : '') +
         (t.fb ? `<div class="fb">💬 ${esc(t.fb)}</div>` : '') +
         `<div class="meta"><span>${t.taster ? '👤 ' + esc(t.taster) : ''}</span><span>${t.time}</span></div>`;
       cards.appendChild(c);
@@ -268,7 +263,6 @@
   $('save').addEventListener('click', () => {
     const name = $('name').value.trim();
     if (!name) return warn('ใส่ชื่อชา/สูตรก่อนนะ');
-    if (!rating) return warn('ให้คะแนนรวม (ดาว) ก่อนนะ');
     entries.unshift({
       name,
       ver: $('ver').value.trim(),
@@ -276,7 +270,8 @@
       sweet: Number($('sweet').value),
       body: Number($('body').value),
       aroma: Number($('aroma').value),
-      rating,
+      like: Number($('like').value),
+      color: $('color').value.trim(),
       fb: $('fb').value.trim(),
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
     });
@@ -289,13 +284,12 @@
     $('name').value = '';
     $('ver').value = '';
     $('fb').value = '';
+    $('color').value = '';
     if (all) $('taster').value = '';
-    for (const id of ['sweet', 'body', 'aroma']) {
-      $(id).value = 3;
+    for (const id of SLIDERS) {
+      $(id).value = 5;
       $(id).dispatchEvent(new Event('input'));
     }
-    rating = 0;
-    [...$('stars').children].forEach((s) => s.classList.remove('on'));
     $('name').focus();
   }
 
