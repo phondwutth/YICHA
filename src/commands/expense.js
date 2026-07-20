@@ -30,12 +30,21 @@ module.exports = {
     .addSubcommand((sc) => sc.setName('add').setDescription('เพิ่มรายจ่าย (เปิดฟอร์มกรอก)'))
     .addSubcommand((sc) =>
       sc.setName('list').setDescription('ดูรายจ่ายล่าสุด + ยอดรวมเดือนนี้'),
+    )
+    .addSubcommand((sc) =>
+      sc
+        .setName('delete')
+        .setDescription('ลบรายจ่ายที่กรอกผิด')
+        .addIntegerOption((o) =>
+          o.setName('id').setDescription('เลขรายการ (ดูจาก /expense list)').setRequired(true),
+        ),
     ),
 
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
     if (sub === 'add') return openAddModal(interaction);
     if (sub === 'list') return listExpenses(interaction);
+    if (sub === 'delete') return deleteExpense(interaction);
   },
 
   modalNamespace: 'expense',
@@ -78,6 +87,12 @@ function addExpense(interaction) {
       content: `❌ วันที่ต้องเป็นรูปแบบ ปี-เดือน-วัน เช่น ${todayTH()}`,
       ephemeral: true,
     });
+  // กันพิมพ์ปี/วันที่ผิดเป็นอนาคต (เคยเจอกรอก 2027 แล้วยอดรวมเดือนไม่ตรง)
+  if (dateRaw && dateRaw > todayTH())
+    return interaction.reply({
+      content: `❌ วันที่เป็นอนาคต (${dateRaw}) — เช็คปีอีกทีนะ วันนี้คือ ${todayTH()}`,
+      ephemeral: true,
+    });
   const date = dateRaw || todayTH();
   const memberId = ensureMember(interaction.user);
 
@@ -112,10 +127,22 @@ function listExpenses(interaction) {
   let out = `📒 รายจ่ายล่าสุด\n\n`;
   for (const r of rows) {
     out +=
-      `\`${r.date}\` **${r.amount.toFixed(2)}฿** — ${r.description}` +
+      `\`#${r.id}\` \`${r.date}\` **${r.amount.toFixed(2)}฿** — ${r.description}` +
       (r.category ? ` _(${r.category})_` : '') +
       '\n';
   }
   out += `\n━━━━━━━━━━━━━\n📅 รวมเดือน ${month}: **${monthTotal.toFixed(2)}฿**`;
+  out += `\n_ลบรายการผิด: \`/expense delete id:...\`_`;
   return interaction.reply(out.slice(0, 1900));
+}
+
+function deleteExpense(interaction) {
+  const id = interaction.options.getInteger('id');
+  const row = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+  if (!row) return interaction.reply({ content: `❌ ไม่เจอรายการ #${id}`, ephemeral: true });
+  db.prepare('DELETE FROM purchase_items WHERE expense_id = ?').run(id);
+  db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
+  return interaction.reply(
+    `🗑️ ลบรายจ่าย \`#${id}\` แล้ว — ${row.date} · ${row.amount.toFixed(2)}฿ · ${row.description || '-'}`,
+  );
 }

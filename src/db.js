@@ -43,6 +43,20 @@ db.exec(schema);
 const msCols = db.prepare(`PRAGMA table_info(milestones)`).all().map((c) => c.name);
 if (!msCols.includes('thread_id')) db.exec(`ALTER TABLE milestones ADD COLUMN thread_id TEXT`);
 
+// maintenance: ลบรายจ่ายที่วันที่หลุดไปปี 2027 (พิมพ์ปีผิด) — ตั้ง env WIPE_EXPENSE_2027=1 แล้ว restart
+// (backup ลง log ก่อนลบเสมอ · เสร็จแล้วต้องเอา env ออกด้วย)
+if (process.env.WIPE_EXPENSE_2027 === '1') {
+  const rows = db.prepare(`SELECT * FROM expenses WHERE date >= '2027-01-01'`).all();
+  if (rows.length) {
+    console.log('🗑️ backup expenses ปี 2027 ก่อนลบ: ' + JSON.stringify(rows));
+    db.prepare(`DELETE FROM purchase_items WHERE expense_id IN (SELECT id FROM expenses WHERE date >= '2027-01-01')`).run();
+    db.prepare(`DELETE FROM expenses WHERE date >= '2027-01-01'`).run();
+    console.log(`🗑️ ลบรายจ่ายปี 2027 แล้ว (${rows.length} รายการ)`);
+  } else {
+    console.log('🗑️ ไม่มีรายจ่ายปี 2027 ให้ลบ');
+  }
+}
+
 // maintenance: ล้างตารางเบิกเงินครั้งเดียว — ตั้ง env WIPE_REIMBURSEMENTS=1 แล้ว restart
 // (backup ลง log ก่อนลบเสมอ · เสร็จแล้วต้องเอา env ออกด้วย)
 if (process.env.WIPE_REIMBURSEMENTS === '1') {
