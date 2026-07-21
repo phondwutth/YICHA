@@ -90,22 +90,6 @@ if (process.env.IMPORT_EXPENSES_JSON) {
   }
 }
 
-// maintenance: ลบรายจ่ายซ้ำในวัน 2026-07-18 (กัน import ซ้ำ) — เก็บ id น้อยสุดของแต่ละ (desc, amount)
-//   ตั้ง env DEDUP_EXPENSES_0718=1 แล้ว restart · เสร็จแล้วเอา env ออก
-if (process.env.DEDUP_EXPENSES_0718 === '1') {
-  const before = db.prepare(`SELECT COUNT(*) c FROM expenses WHERE date='2026-07-18'`).get().c;
-  const res = db
-    .prepare(
-      `DELETE FROM expenses WHERE date='2026-07-18' AND id NOT IN (
-         SELECT MIN(id) FROM expenses WHERE date='2026-07-18' GROUP BY description, amount
-       )`,
-    )
-    .run();
-  const after = db.prepare(`SELECT COUNT(*) c FROM expenses WHERE date='2026-07-18'`).get().c;
-  const total = db.prepare(`SELECT COALESCE(SUM(amount),0) t FROM expenses WHERE date='2026-07-18'`).get().t;
-  console.log(`🧹 dedup 2026-07-18: ${before} -> ${after} แถว (ลบซ้ำ ${res.changes}) · รวม ${total.toFixed(2)}฿`);
-}
-
 // diagnostic: dump รายจ่ายของวันที่กำหนด — ตั้ง env DIAG_EXPENSE_DATE=YYYY-MM-DD แล้ว restart
 if (process.env.DIAG_EXPENSE_DATE) {
   const d = process.env.DIAG_EXPENSE_DATE;
