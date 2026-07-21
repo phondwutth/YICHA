@@ -106,6 +106,21 @@ if (process.env.DEDUP_EXPENSES_0718 === '1') {
   console.log(`🧹 dedup 2026-07-18: ${before} -> ${after} แถว (ลบซ้ำ ${res.changes}) · รวม ${total.toFixed(2)}฿`);
 }
 
+// diagnostic: dump รายจ่ายของวันที่กำหนด — ตั้ง env DIAG_EXPENSE_DATE=YYYY-MM-DD แล้ว restart
+if (process.env.DIAG_EXPENSE_DATE) {
+  const d = process.env.DIAG_EXPENSE_DATE;
+  const rows = db
+    .prepare(
+      `SELECT e.id, e.amount, e.description, c.name cat, e.created_at
+       FROM expenses e LEFT JOIN expense_categories c ON c.id = e.category_id
+       WHERE e.date = ? ORDER BY e.id`,
+    )
+    .all(d);
+  console.log(`🔎 รายจ่ายวันที่ ${d}: ${rows.length} แถว`);
+  for (const r of rows)
+    console.log(`   #${r.id} · ${r.amount}฿ · ${r.description} · [${r.cat || '-'}] · สร้าง ${r.created_at}`);
+}
+
 // maintenance: ล้างตารางเบิกเงินครั้งเดียว — ตั้ง env WIPE_REIMBURSEMENTS=1 แล้ว restart
 // (backup ลง log ก่อนลบเสมอ · เสร็จแล้วต้องเอา env ออกด้วย)
 if (process.env.WIPE_REIMBURSEMENTS === '1') {
