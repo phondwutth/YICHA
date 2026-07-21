@@ -43,6 +43,10 @@ db.exec(schema);
 const msCols = db.prepare(`PRAGMA table_info(milestones)`).all().map((c) => c.name);
 if (!msCols.includes('thread_id')) db.exec(`ALTER TABLE milestones ADD COLUMN thread_id TEXT`);
 
+const rmCols = db.prepare(`PRAGMA table_info(reimbursements)`).all().map((c) => c.name);
+if (!rmCols.includes('deduct_pool'))
+  db.exec(`ALTER TABLE reimbursements ADD COLUMN deduct_pool INTEGER NOT NULL DEFAULT 0`);
+
 // maintenance: ลบรายจ่ายที่วันที่หลุดไปปี 2027 (พิมพ์ปีผิด) — ตั้ง env WIPE_EXPENSE_2027=1 แล้ว restart
 // (backup ลง log ก่อนลบเสมอ · เสร็จแล้วต้องเอา env ออกด้วย)
 if (process.env.WIPE_EXPENSE_2027 === '1') {

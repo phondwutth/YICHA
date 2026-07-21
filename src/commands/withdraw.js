@@ -9,8 +9,9 @@ const {
 } = require('discord.js');
 const db = require('../db');
 const { ensureMember } = require('../lib/members');
-const { textField, num } = require('../lib/modal');
+const { textField, selectField, num } = require('../lib/modal');
 const { getSetting } = require('../lib/forum');
+const { poolBalance, ledgerAdd } = require('../lib/cash');
 
 function reqEmbed(row, requesterTag) {
   const color = { pending: 0xf1c40f, paid: 0x2ecc71, rejected: 0xe74c3c }[row.status];
@@ -21,6 +22,11 @@ function reqEmbed(row, requesterTag) {
     .addFields(
       { name: 'จำนวน', value: `**${row.amount.toFixed(2)}฿**`, inline: true },
       { name: 'สถานะ', value: statusText, inline: true },
+      {
+        name: 'ที่มาเงิน',
+        value: row.deduct_pool ? '💰 หักจากกองกลาง' : '👤 ผู้ขอสำรองจ่าย',
+        inline: true,
+      },
       { name: 'เหตุผล', value: row.reason || '-' },
     );
   if (requesterTag) e.addFields({ name: 'ผู้ขอ', value: requesterTag, inline: true });
@@ -97,6 +103,8 @@ module.exports = {
         `UPDATE reimbursements SET status = 'paid', approver = ?, resolved_at = ? WHERE id = ?`,
       ).run(approverId, now, id);
       row.status = 'paid';
+      // หักจากกองกลางถ้าคำขอเลือกไว้
+      if (row.deduct_pool) ledgerAdd('out', row.amount, 'reimbursement', id, row.reason);
     } else {
       db.prepare(
         `UPDATE reimbursements SET status = 'rejected', approver = ?, resolved_at = ? WHERE id = ?`,
@@ -116,10 +124,15 @@ module.exports = {
     if (post?.isThread()) {
       const tagId = getSetting(`forumtag:withdraw:${action === 'approve' ? 'paid' : 'rejected'}`);
       if (tagId) await post.setAppliedTags([tagId]).catch(() => {});
-      const note =
-        action === 'approve'
-          ? `${verb} — ยอด ${row.amount.toFixed(2)}฿\n📎 โอนแล้วอย่าลืมแนบสลิปไว้ในโพสต์นี้เป็นหลักฐาน`
-          : `${verb}`;
+      let note;
+      if (action === 'approve') {
+        note = `${verb} — ยอด ${row.amount.toFixed(2)}฿`;
+        if (row.deduct_pool)
+          note += `\n💰 หักจากกองกลางแล้ว · ยอดคงเหลือ ${poolBalance().toFixed(2)}฿`;
+        note += `\n📎 โอนแล้วอย่าลืมแนบสลิปไว้ในโพสต์นี้เป็นหลักฐาน`;
+      } else {
+        note = verb;
+      }
       await post.send(note).catch(() => {});
     }
   },
@@ -132,6 +145,10 @@ function openRequestModal(interaction) {
     .addLabelComponents(
       textField('amount', 'จำนวนเงิน (บาท)', { placeholder: 'เช่น 500', required: true }),
       textField('reason', 'เบิกไปทำอะไร', { required: true, paragraph: true, maxLength: 200 }),
+      selectField('deduct', 'ที่มาเงิน', [
+        { label: 'ผู้ขอสำรองจ่ายเอง (ไม่หักกองกลาง)', value: 'no', default: true },
+        { label: 'หักจากเงินกองกลาง', value: 'yes' },
+      ]),
     );
   return interaction.showModal(modal);
 }
@@ -141,6 +158,7 @@ async function request(interaction) {
   if (amount == null || amount <= 0)
     return interaction.reply({ content: '❌ จำนวนเงินต้องเป็นตัวเลข เช่น 500', ephemeral: true });
   const reason = interaction.fields.getTextInputValue('reason').trim();
+  const deductPool = interaction.fields.getStringSelectValues('deduct')[0] === 'yes' ? 1 : 0;
   const memberId = ensureMember(interaction.user);
 
   // โพสต์ลง forum เบิกเงิน (บอทสร้าง forum ให้เองตอนสตาร์ท)
@@ -156,10 +174,11 @@ async function request(interaction) {
 
   const info = db
     .prepare(
-      `INSERT INTO reimbursements (requester, amount, reason, status) VALUES (?, ?, ?, 'pending')`,
+      `INSERT INTO reimbursements (requester, amount, reason, status, deduct_pool)
+       VALUES (?, ?, ?, 'pending', ?)`,
     )
-    .run(memberId, amount, reason);
-  const row = { id: info.lastInsertRowid, amount, reason, status: 'pending' };
+    .run(memberId, amount, reason, deductPool);
+  const row = { id: info.lastInsertRowid, amount, reason, status: 'pending', deduct_pool: deductPool };
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder()

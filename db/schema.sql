@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS reimbursements (
   status       TEXT NOT NULL DEFAULT 'pending',  -- pending / approved / paid / rejected
   approver     INTEGER REFERENCES members(id),
   slip_id      INTEGER REFERENCES slips(id),     -- สลิปตอนจ่ายคืน
+  deduct_pool  INTEGER NOT NULL DEFAULT 0,       -- 1 = พออนุมัติให้หักจากเงินกองกลาง
   note         TEXT,
   requested_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   resolved_at  TEXT
