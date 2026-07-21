@@ -61,6 +61,35 @@ if (process.env.WIPE_EXPENSE_2027 === '1') {
   }
 }
 
+// maintenance: import รายจ่ายเป็นชุด — ตั้ง env IMPORT_EXPENSES_JSON เป็น array ของ
+//   [{ date:"2026-07-18", category:"วัตถุดิบ", desc:"...", amount:345, method:"cash" }]
+//   แล้ว restart · เสร็จแล้วเอา env ออกด้วย (กัน import ซ้ำตอนบูตครั้งหน้า)
+if (process.env.IMPORT_EXPENSES_JSON) {
+  try {
+    const items = JSON.parse(process.env.IMPORT_EXPENSES_JSON);
+    const member = db.prepare('SELECT id FROM members ORDER BY id LIMIT 1').get();
+    const memberId = member ? member.id : null;
+    const catId = (name) => {
+      if (!name) return null;
+      const r = db.prepare('SELECT id FROM expense_categories WHERE name = ? COLLATE NOCASE').get(name);
+      return r ? r.id : db.prepare('INSERT INTO expense_categories (name) VALUES (?)').run(name).lastInsertRowid;
+    };
+    const ins = db.prepare(
+      `INSERT INTO expenses (date, category_id, description, amount, payment_method, paid_by, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    let total = 0;
+    for (const e of items) {
+      ins.run(e.date, catId(e.category), e.desc, e.amount, e.method || 'cash', memberId, memberId);
+      total += e.amount;
+      console.log(`➕ import expense: ${e.date} ${e.amount}฿ — ${e.desc} (${e.category || '-'})`);
+    }
+    console.log(`✅ import รายจ่าย ${items.length} รายการ รวม ${total.toFixed(2)}฿`);
+  } catch (err) {
+    console.error('❌ import expenses ล้มเหลว:', err.message);
+  }
+}
+
 // maintenance: ล้างตารางเบิกเงินครั้งเดียว — ตั้ง env WIPE_REIMBURSEMENTS=1 แล้ว restart
 // (backup ลง log ก่อนลบเสมอ · เสร็จแล้วต้องเอา env ออกด้วย)
 if (process.env.WIPE_REIMBURSEMENTS === '1') {
